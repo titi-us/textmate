@@ -3,19 +3,19 @@
 
 class ThemeTests : public CxxTest::TestSuite
 {
-	class npow2 {
-		enum {one = 1<<32};
-		int backing;
+	struct npow2 {
+		enum {one = 1ll <<40};
+		unsigned long long backing;
 		npow2():backing(0) {}
 
 		npow2(int exponent) {
 			backing = one>>exponent;
 		}
-		bool operator >(npow2 rhs) {
-			return backing > rhs.backing;
+		bool operator <(const npow2& rhs) const{
+			return backing < rhs.backing;
 		}
 		npow2& operator -= (npow2 rhs) {
-			backing =-rhs.backing;
+			backing -=rhs.backing;
 			return *this;
 		}
 		npow2& operator += (npow2 rhs) {
@@ -103,7 +103,7 @@ class ThemeTests : public CxxTest::TestSuite
 		}
 		
 		iterate(it, ordering) {
-			printf("item: %.4f %s\n", it->first, it->second.c_str());
+			printf("item: %.5f %s\n", it->first, it->second.c_str());
 			total += it->first;
 		}
 	   }
@@ -210,18 +210,20 @@ class ThemeTests : public CxxTest::TestSuite
 		}
 
 		//f// printf(stderr, "pathx: %s\n", root.to_s().c_str());
-		double total = 0.0;		
+		npow2 total;		
 		oak::duration_t timer2;
 		
 		int computed = 0;
 		for(size_t times = 0 ; times < repeat ;times++){
-			total = 0.0;
+			total = npow2();
 			
 			size_t s = p.size();
-			std::vector<double> collector(11); 
-			std::multimap<double, std::string> ordering;
+			std::vector<npow2> collector(11); 
+			std::multimap<npow2, std::string> ordering;
 			rules_t::internal_t v;
 			int power = 0;
+			npow2 sco(1);
+			printf("score 1 b:%llu \n", sco.backing);
 			
 		while(s--)
 		{
@@ -236,9 +238,13 @@ class ThemeTests : public CxxTest::TestSuite
 				path = current;
 				if(path->match)
 				{
-					double score = 0;
-					for(size_t k = 0; k < j; ++k)
-						score += 1 / pow(2, power - k);
+
+					npow2 score(power - j);
+					printf("ffs p:%d j:%d b:%llu s:%s\n",power, j, score.backing, p[s][j-1].c_str());
+
+					score-=npow2(power);
+					printf("ffs b:%llu \n", score.backing);
+					
 					collector[path->id] = score;
 				}
 			}
@@ -255,9 +261,9 @@ class ThemeTests : public CxxTest::TestSuite
 		while(int idx = ffs(computed)) {
 			// printf("ffs %d %s\n",idx, selectorStrings[idx-1].c_str());
 			
-			double rank;
+			npow2 rank;
 			if(does_match(v, matchingSelectors[idx - 1],&rank) ) {
-				double& val = collector[idx-1];
+				npow2& val = collector[idx-1];
 				if( val < rank)
 					val = rank;
 					
@@ -268,19 +274,19 @@ class ThemeTests : public CxxTest::TestSuite
 		}
 		int index = 0;
 		iterate(it, collector) {
-			printf("collector item: %.4f %d\n", *it, index);
+			printf("collector item: %llu %d\n", it->backing, index);
 
 			ordering.insert(std::make_pair(*it, selectorStrings[index++]));
 		}
 		
 		iterate(it, ordering) {
-			printf("item: %.4f %s\n", it->first, it->second.c_str());
+			printf("item:  %llu %s\n", it->first.backing, it->second.c_str());
 			total += it->first;
 		}
 	   		
 		}
 		
-		printf("%.4f seconds to computed path_x:%.1f \n", timer2.duration(), total);
+		printf("%.4f seconds to computed path_x:%llu \n", timer2.duration(), total.backing);
 	}
 	static size_t route_length(const int& route) {
 		if(route & 2){ // 1<<1
@@ -291,7 +297,7 @@ class ThemeTests : public CxxTest::TestSuite
 		}
 		return 1;
 	}
-	bool does_match (rules_t::internal_t& path, rules_t::internal_t& scopes, double* rank ) const
+	bool does_match (rules_t::internal_t& path, rules_t::internal_t& scopes, npow2* rank ) const
 	{
 
 		size_t i = path.size(); // “source.ruby string.quoted.double constant.character”
@@ -300,8 +306,8 @@ class ThemeTests : public CxxTest::TestSuite
 		// printf("path size: %zu\n", i);
 		// printf("size: %zu\n", j);
 
-		double score = 0;
-		double power = 0;
+		npow2 score;
+		int power = 0;
 		while(j <= i && j)
 		{
 			// if(anchor_to_bol)
@@ -311,8 +317,12 @@ class ThemeTests : public CxxTest::TestSuite
 
 			if(scopes[j-1].pattern  == (path[s-i].pattern & scopes[j-1].mask))
 			{
-				for(size_t k = 0; k < scopes[j-1].size; ++k)
+				/*for(size_t k = 0; k < scopes[j-1].size; ++k)
 					score += 1 / pow(2, power - k);
+				*/
+				npow2 temp(power - scopes[j-1].size);
+				temp-=npow2(power);
+				score +=temp;
 				--j;
 			}
 			--i;
