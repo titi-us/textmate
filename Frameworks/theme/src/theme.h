@@ -37,7 +37,7 @@ struct PUBLIC theme_t
 	oak::uuid_t const& uuid () const;
 	styles_t const& styles_for_scope (scope::context_t const& scope, std::string fontName, CGFloat fontSize) const;
 
-private:
+public:
 	enum bool_t { bool_true, bool_false, bool_unset };
 
 	struct decomposed_style_t
