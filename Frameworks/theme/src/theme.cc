@@ -205,7 +205,21 @@ static std::string alpha_blend (std::string const& lhs, std::string const& rhs)
 
 	return text::format("#%02lX%02lX%02lX%02lX", lround(255 * red), lround(255 * green), lround(255 * blue), lround(255 * alpha));
 }
-
+static read_color (std::string const& str_color, theme_t::decomposed_style_t::color_info_t& color ) 
+{
+	enum { R, G, B, A };
+	unsigned int col[2][4] = { { 0x00, 0x00, 0x00, 0xFF }, { 0x00, 0x00, 0x00, 0xFF } };
+	
+	int res = sscanf(str_color.c_str(), "#%02x%02x%02x%02x", &col[1][R], &col[1][G], &col[1][B], &col[1][A]) < 4 || col[1][A] == 0xFF);
+	if(res < 3) {
+		color = theme_t::decomposed_style_t::color_info_t::color_info_t();   	
+	}
+}
+static alpha_blend (theme_t::decomposed_style_t::color_info_t& lhs, theme_t::decomposed_style_t::color_info_t const& rhs)
+{
+	if(!lhs.is_set() || !rhs.is_set() || !rhs.has_alpha())
+		return;
+}
 static double my_strtod (char const* str, char const** last) // problem with strtod() is that it uses LC_NUMERIC for point separator.
 {
 	double res = atof(str);

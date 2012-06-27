@@ -42,6 +42,16 @@ public:
 
 	struct decomposed_style_t
 	{
+		struct color_info_t
+		{
+			color_info_t():red(0.0), green(0.0),blue(0.0), alpha(0.0) {}
+			double red;
+			double green;
+			double blue;
+			double alpha;
+			bool is_set ();
+			bool has_alpha ();
+		}
 		decomposed_style_t (scope::selector_t const& scopeSelector = scope::selector_t(), std::string const& fontName = NULL_STR, CGFloat fontSize = 0) : scope_selector(scopeSelector), font_name(fontName), font_size(NULL_STR), foreground(NULL_STR), background(NULL_STR), caret(NULL_STR), selection(NULL_STR), invisibles(NULL_STR), bold(bool_unset), italic(bool_unset), underlined(bool_unset), misspelled(bool_unset), absolute_font_size(fontSize) { }
 		decomposed_style_t& operator+= (decomposed_style_t const& rhs);
 
