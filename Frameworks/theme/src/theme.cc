@@ -234,7 +234,7 @@ static theme_t::decomposed_style_t::color_info_t read_color (std::string const& 
 	unsigned int col[4] = { 0x00, 0x00, 0x00, 0xFF } ;
 	
 	int res = sscanf(str_color.c_str(), "#%02x%02x%02x%02x", &col[R], &col[G], &col[B], &col[A]);// < 4 || col[1][A] == 0xFF);
-	if(res < 3) { // R G B was not parsed, or color is 100% transparent
+	if(res < 3) { // R G B was not parsed
 		return theme_t::decomposed_style_t::color_info_t::color_info_t(); // color is not set
 	}
 	
@@ -252,7 +252,7 @@ static void alpha_blend (theme_t::decomposed_style_t::color_info_t& lhs, theme_t
 	} 
 	else 
 	{
-		double alpha = rhs.alpha;
+		double alpha = lhs.alpha = rhs.alpha;
 		lhs.red   = (1.0 - alpha) * lhs.red + alpha * rhs.red;
 		lhs.green = (1.0 - alpha) * lhs.green + alpha * rhs.green;
 		lhs.blue  = (1.0 - alpha) * lhs.blue + alpha * rhs.blue;
