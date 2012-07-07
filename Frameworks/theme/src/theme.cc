@@ -266,7 +266,7 @@ static void alpha_blend (theme_t::decomposed_style_t::color_info_t& lhs, theme_t
 	} 
 	else 
 	{
-		double alpha = lhs.alpha = rhs.alpha;
+		double alpha = rhs.alpha;
 		lhs.red   = (1.0 - alpha) * lhs.red + alpha * rhs.red;
 		lhs.green = (1.0 - alpha) * lhs.green + alpha * rhs.green;
 		lhs.blue  = (1.0 - alpha) * lhs.blue + alpha * rhs.blue;
@@ -346,12 +346,12 @@ theme_t::decomposed_style_t& theme_t::decomposed_style_t::operator+= (theme_t::d
 }
 
 std::string theme_t::decomposed_style_t::to_s () const{
-	return "decomposed! " +font_name +
-		     foreground.to_s() +
-		     background.to_s() +
-		     caret.to_s() +
-		     selection.to_s() +
-			  invisibles.to_s() + scope::to_s(scope_selector);		
+	return "part! f:" +
+		     foreground.to_s() + " b:"+
+		     background.to_s() +" c:"+
+		     caret.to_s() +" s:"+
+		     selection.to_s() +" i:"+
+			  invisibles.to_s() + " scope:" +scope::to_s(scope_selector);		
 }
 
 // ==============
