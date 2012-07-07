@@ -3,6 +3,7 @@
 
 #include <bundles/bundles.h>
 #include <scope/scope.h>
+#include <scope/compile.h>
 #include <cf/color.h>
 
 typedef std::tr1::shared_ptr<struct __CTFont const> CTFontPtr;
@@ -18,7 +19,7 @@ struct PUBLIC styles_t
 	CTFontRef font () const        { return _font.get(); }
 	bool underlined () const       { return _underlined; }
 	bool misspelled () const       { return _misspelled; }
-
+	friend std::string to_s (styles_t const& c);
 private:
 	cf::color_t _foreground;
 	cf::color_t _background;
@@ -28,6 +29,7 @@ private:
 	bool _underlined;
 	bool _misspelled;
 };
+PUBLIC std::string to_s (styles_t const& c);
 
 struct PUBLIC theme_t
 {
@@ -52,16 +54,15 @@ public:
 			double alpha;
 			bool is_blank () const { return red < 0.0 ; }
 			bool is_opaque () const { return alpha == 1.0; };
-			operator cf::color_t () { 	return cf::color_t(text::format("#%02lX%02lX%02lX%02lX", lround(255 * red), lround(255 * green), lround(255 * blue), lround(255 * alpha)));
+			operator cf::color_t () { return cf::color_t(text::format("#%02lX%02lX%02lX%02lX", lround(255 * red), lround(255 * green), lround(255 * blue), lround(255 * alpha)));
 }
 		};
-		decomposed_style_t (scope::selector_t const& scopeSelector = scope::selector_t(), std::string const& fontName = NULL_STR, CGFloat fontSize = 0) : scope_selector(scopeSelector), font_name(fontName), font_size(NULL_STR), bold(bool_unset), italic(bool_unset), underlined(bool_unset), misspelled(bool_unset), absolute_font_size(fontSize) { }
+		decomposed_style_t (scope::selector_t const& scopeSelector = scope::selector_t(), std::string const& fontName = NULL_STR, CGFloat fontSize = 0) : scope_selector(scopeSelector), font_name(fontName), bold(bool_unset), italic(bool_unset), underlined(bool_unset), misspelled(bool_unset), absolute_font_size(fontSize) { }
 		decomposed_style_t& operator+= (decomposed_style_t const& rhs);
 
 		scope::selector_t scope_selector;
 
 		std::string font_name;
-		std::string font_size;
 		color_info_t foreground;
 		color_info_t background;
 		color_info_t caret;
@@ -91,6 +92,8 @@ public:
 	bundles::item_ptr _item;
 	std::vector<decomposed_style_t> _styles;
 	callback_t _callback;
+
+	scope::compile::compiled_t<decomposed_style_t> compiled;
 
 	typedef boost::tuple<scope::context_t, std::string, CGFloat> key_t; // scope, font name, font size
 	mutable std::map<key_t, styles_t> _cache;
