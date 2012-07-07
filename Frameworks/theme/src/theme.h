@@ -47,19 +47,19 @@ public:
 		struct color_info_t
 		{
 			color_info_t() : red(-1.0), green(0.0),blue(0.0), alpha(1.0) {}
-			color_info_t(double red, double green, double blue, double alpha = 1.0) {} 
+			color_info_t(double red, double green, double blue, double alpha = 1.0):red(red),green(green),blue(blue),alpha(alpha) {} 
 			double red;
 			double green;
 			double blue;
 			double alpha;
 			bool is_blank () const { return red < 0.0 ; }
 			bool is_opaque () const { return alpha == 1.0; };
-			operator cf::color_t () { return cf::color_t(text::format("#%02lX%02lX%02lX%02lX", lround(255 * red), lround(255 * green), lround(255 * blue), lround(255 * alpha)));
-}
+			operator cf::color_t () { return cf::color_t(text::format("#%02lX%02lX%02lX%02lX", lround(255 * red), lround(255 * green), lround(255 * blue), lround(255 * alpha)));}
+			std::string to_s () const { return text::format("color:%.5f %.5f %.5f %.5f", red, green, blue, alpha);}
 		};
 		decomposed_style_t (scope::selector_t const& scopeSelector = scope::selector_t(), std::string const& fontName = NULL_STR, CGFloat fontSize = 0) : scope_selector(scopeSelector), font_name(fontName), bold(bool_unset), italic(bool_unset), underlined(bool_unset), misspelled(bool_unset), absolute_font_size(fontSize) { }
 		decomposed_style_t& operator+= (decomposed_style_t const& rhs);
-
+		std::string to_s() const;
 		scope::selector_t scope_selector;
 
 		std::string font_name;
@@ -72,7 +72,7 @@ public:
 		bool_t italic;
 		bool_t underlined;
 		bool_t misspelled;
-
+		
 		CGFloat absolute_font_size;
 	};
 
