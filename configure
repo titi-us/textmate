@@ -89,6 +89,7 @@ done
 
 test -d .git && git submodule update --init
 
+DST="$builddir" make -C Frameworks/scm -j10 "$builddir/svnlibs"
 DST="$builddir/Frameworks/SoftwareUpdate/fixtures" make -C Frameworks/SoftwareUpdate/fixtures
 
 # # Necessary if you do distribution builds (which should include some default bundles)

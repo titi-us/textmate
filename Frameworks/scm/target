@@ -1,5 +1,23 @@
 SOURCES      = src/**/*.cc
 TEST_SOURCES = tests/t_*.cc
 EXPORT       = src/{scm,snapshot}.h
+LIBS         = expat iconv z
 LINK        += text cf io settings OakSystem
 FRAMEWORKS   = Carbon Security
+
+FLAGS       += -I'${builddir}/subversion-${SVN_VERSION}/apr/include' -I'${builddir}/subversion-${SVN_VERSION}/subversion/include'
+
+LIBS        += ${builddir}/svnlibs/libapr-1.a
+LIBS        += ${builddir}/svnlibs/libaprutil-1.a
+LIBS        += ${builddir}/svnlibs/libsvn_client-1.a
+LIBS        += ${builddir}/svnlibs/libsvn_delta-1.a
+LIBS        += ${builddir}/svnlibs/libsvn_diff-1.a
+LIBS        += ${builddir}/svnlibs/libsvn_fs-1.a
+LIBS        += ${builddir}/svnlibs/libsvn_fs_fs-1.a
+LIBS        += ${builddir}/svnlibs/libsvn_fs_util-1.a
+LIBS        += ${builddir}/svnlibs/libsvn_ra-1.a
+LIBS        += ${builddir}/svnlibs/libsvn_ra_local-1.a
+LIBS        += ${builddir}/svnlibs/libsvn_ra_svn-1.a
+LIBS        += ${builddir}/svnlibs/libsvn_repos-1.a
+LIBS        += ${builddir}/svnlibs/libsvn_subr-1.a
+LIBS        += ${builddir}/svnlibs/libsvn_wc-1.a
