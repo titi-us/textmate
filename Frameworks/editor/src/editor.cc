@@ -231,6 +231,7 @@ namespace ng
 		set_clipboard(create_simple_clipboard());
 		set_find_clipboard(create_simple_clipboard());
 		set_replace_clipboard(create_simple_clipboard());
+		set_yank_clipboard(create_simple_clipboard());
 	}
 
 	editor_t::editor_t () : _buffer(dummy)
@@ -469,7 +470,11 @@ namespace ng
 				if(indent != NULL_STR)
 					str = indent + str;
 				if(complete)
-					str += '\n';
+				{
+					std::string const& rightOfCaret = buffer.substr(index, buffer.eol(line));
+					if(!text::is_blank(rightOfCaret.data(), rightOfCaret.data() + rightOfCaret.size()))
+						str += '\n';
+				}
 
 				int minIndent = INT_MAX;
 
@@ -480,7 +485,9 @@ namespace ng
 						minIndent = std::min(indent::leading_whitespace(it->first, it->second, tabSize), minIndent);
 				}
 
-				if(plist::is_true(bundles::value_for_setting("disableIndentCorrections", buffer.scope(index))))
+				plist::any_t pasteBehaviorValue = bundles::value_for_setting("indentOnPaste", buffer.scope(index));
+				std::string const* pasteBehavior = boost::get<std::string>(&pasteBehaviorValue);
+				if(pasteBehavior && *pasteBehavior == "simple")
 				{
 					int currentIndent = indent::leading_whitespace(leftOfCaret.data(), leftOfCaret.data() + leftOfCaret.size(), tabSize);
 					if(currentIndent)
@@ -494,7 +501,7 @@ namespace ng
 							str += leftOfCaret;
 					}
 				} 
-				else
+				else if(!pasteBehavior || *pasteBehavior != "disable")
 				{
 					indent::fsm_t fsm = indent::create_fsm(buffer, indent::patterns_for_scope(buffer.scope(index)), line, indentSize, tabSize);
 					iterate(it, v)
@@ -736,9 +743,16 @@ namespace ng
 			case kShiftRight:                                   _selections = ng::extend(_buffer, _selections, kSelectionExtendToLineExclLF,                layout); break;
 		}
 
-		static action_t const deleteActions[] = { kDeleteBackward, kDeleteForward, kDeleteSubWordLeft, kDeleteSubWordRight, kDeleteWordBackward, kDeleteWordForward, kDeleteToBeginningOfLine, kDeleteToEndOfLine, kDeleteToBeginningOfParagraph, kDeleteToEndOfParagraph };
+		static action_t const deleteActions[]      = { kDeleteBackward, kDeleteForward };
+		static action_t const yankAppendActions[]  = { kDeleteSubWordRight, kDeleteWordForward,  kDeleteToEndOfLine,       kDeleteToEndOfParagraph       };
+		static action_t const yankPrependActions[] = { kDeleteSubWordLeft,  kDeleteWordBackward, kDeleteToBeginningOfLine, kDeleteToBeginningOfParagraph };
 		if(oak::contains(beginof(deleteActions), endof(deleteActions), action))
 			action = kDeleteSelection;
+		else if(oak::contains(beginof(yankAppendActions), endof(yankAppendActions), action))
+			action = _extend_yank_clipboard ? kAppendSelectionToYankPboard : kCopySelectionToYankPboard;
+		else if(oak::contains(beginof(yankPrependActions), endof(yankPrependActions), action))
+			action = _extend_yank_clipboard ? kPrependSelectionToYankPboard : kCopySelectionToYankPboard;
+		_extend_yank_clipboard = false;
 
 		switch(action)
 		{
@@ -837,6 +851,26 @@ namespace ng
 			}
 			break;
 
+			case kCopySelectionToYankPboard:
+			case kAppendSelectionToYankPboard:
+			case kPrependSelectionToYankPboard:
+			{
+				clipboard_t::entry_ptr entry = copy(_buffer, _selections);
+				if(action != kCopySelectionToYankPboard && !yank_clipboard()->empty())
+				{
+					if(clipboard_t::entry_ptr oldEntry = yank_clipboard()->current())
+					{
+						if(action == kAppendSelectionToYankPboard)
+							entry.reset(new my_clipboard_entry_t(oldEntry->content() + entry->content(), "", false, 1, false));
+						else if(action == kPrependSelectionToYankPboard)
+							entry.reset(new my_clipboard_entry_t(entry->content() + oldEntry->content(), "", false, 1, false));
+					}
+				}
+				yank_clipboard()->push_back(entry);
+				_extend_yank_clipboard = true;
+			}
+			// continue
+         
 			case kDeleteSelection:
 			{
 				indent_helper_t indent_helper(*this, _buffer);
@@ -894,7 +928,12 @@ namespace ng
 			case kPasteNext:                                    _selections = paste(_buffer, _selections, _snippets, clipboard()->next());                                                  break;
 			case kPasteWithoutReindent:                         insert(clipboard()->current()->content());                                                                                  break;
 
-			case kYank:                                         insert("TODO");               break;
+			case kYank:
+			{
+				if(clipboard_t::entry_ptr entry = yank_clipboard()->current())
+					insert(entry->content());
+			}
+			break;
 
 			case kInsertTab:
 			{

@@ -1,4 +1,4 @@
-#!/usr/bin/env ruby -wKU
+#!/System/Library/Frameworks/Ruby.framework/Versions/1.8/usr/bin/ruby -wKU
 # == Synopsis
 #
 # gen_build: create build.ninja based on target files
@@ -37,8 +37,6 @@ class Targets
   include Enumerable
 
   attr_reader :root
-  attr_reader :applications
-  attr_reader :frameworks
   attr_reader :dependencies
 
   def initialize(path)
@@ -46,15 +44,16 @@ class Targets
     linked  = Set.new(targets.collect { |target| target['LINK'].to_a }.flatten)
 
     @root = targets.first
-    @all, @applications, @frameworks, @dependencies = [ ], [ ], [ ], [ ]
+    @all, @dependencies = [ ], [ ]
 
     targets.each do |target|
       next if target['SOURCES'].to_a.empty?
       @all << target
       if linked.include?(target[:name]) || target['BUILD'] == 'lib'
-        @frameworks << target
+        target[:type] = :library
       else
-        @applications << target
+        has_info_plist = target['CP_Resources'].to_a.find { |path| path =~ /\bInfo\.plist$/ }
+        target[:type] = has_info_plist ? :bundle : :executable
       end
     end
 
@@ -68,10 +67,6 @@ class Targets
       end
     end
     @dependencies = paths.flatten.sort.uniq
-
-    @all.sort!          { |lhs, rhs| lhs[:name].downcase <=> rhs[:name].downcase }
-    @applications.sort! { |lhs, rhs| lhs[:name].downcase <=> rhs[:name].downcase }
-    @frameworks.sort!   { |lhs, rhs| lhs[:name].downcase <=> rhs[:name].downcase }
   end
 
   def target_named(name)
@@ -380,7 +375,7 @@ def object_archive(target)
 end
 
 def dynamic_lib(target)
-  dst = target[:dylib]
+  dst = target[:dylib] = build_path("#{target[:path]}/#{target[:name]}.dylib")
 
   if target[:CP_Resources].to_a.empty?
     install_name = "@executable_path/../Frameworks/#{target[:name]}.dylib"
@@ -611,7 +606,7 @@ open("#{builddir}/build.ninja", "w") do |io|
 
   COMPILER_INFO.each do |key, value|
     io << "rule #{value[:rule]}\n"
-    io << "  command = #{value[:compiler]} $FLAGS $RAVE_FLAGS #{value[:flags]} -o $out -MMD -MF $out.d -I$builddir/include $in\n"
+    io << "  command = '#{value[:compiler]}' $FLAGS $RAVE_FLAGS #{value[:flags]} -o $out -MMD -MF $out.d -I$builddir/include $in\n"
     io << "  depfile = $depfile\n"
     io << "  description = Compile ‘$in’…\n\n"
   end
@@ -623,46 +618,51 @@ open("#{builddir}/build.ninja", "w") do |io|
     io << "  RAVE_FLAGS = #{type[src[/\b[a-z]+$/]]}\n\n"
   end
 
+  # =======================================================
+  # = Do a topological sort based on the dependency graph =
+  # =======================================================
+
+  targets = { } # name → target
+
+  dag = ''
   TARGETS.each do |target|
-    io << headers(target)
-    io << sources(target)
+    target['LINK'].each { |dep| dag << "#{target[:name]}\t#{dep}\n" } unless target['LINK'].nil?
+    target.each do |key, value|
+      value.each { |rsrc| dag << "#{target[:name]}\t#$'\n" if rsrc =~ /^@/ } if key =~ /^CP_/
+    end
+    targets[target[:name]] = target
+  end
+  dag = open('|/usr/bin/tsort -q', 'r+') { |tsort| tsort << dag; tsort.close_write; tsort.read }
+
+  # =========================================================================
+  # = Now iterate the targets (in the sorted order) to generate build rules =
+  # =========================================================================
+
+  dag.scan(/.+/).reverse_each do |name|
+    target = targets[name]
+
     io << clean(target)
-  end
-
-  TARGETS.frameworks.each do |target|
+    io << sources(target)
     io << resources(target)
-    io << object_archive(target)
-    target[:dylib] = build_path("#{target[:path]}/#{target[:name]}.dylib")
-  end
 
-  TARGETS.frameworks.each do |target|
-    io << tests(target)
-    io << dynamic_lib(target)
-  end
-
-  app, exe = [ ], [ ]
-
-  TARGETS.applications.each do |target|
-    if target['CP_Resources'].to_a.find { |path| path =~ /\bInfo\.plist$/ }
-      app << target
+    if target[:type] == :library
+      io << headers(target)
+      io << object_archive(target)
+      io << tests(target)
+      io << dynamic_lib(target)
+    elsif target[:type] == :executable
+      io << static_executable(target)
     else
-      exe << target
+      io << dynamic_executable(target)
+      io << app_bundle(target)
+      io << deploy(target)
     end
   end
 
-  exe.each do |target|
-    io << static_executable(target)
-  end
-
-  app.each do |target|
-    io << resources(target)
-    io << dynamic_executable(target)
-    io << app_bundle(target)
-    io << deploy(target)
-  end
-
   io << "\n"
-  io << "default #{variables.find { |k, _| k == 'APP_NAME' }.last}/run\n"
+  io << "build run:    phony #{variables.find { |k, _| k == 'APP_NAME' }.last}/run\n"
+  io << "build deploy: phony #{variables.find { |k, _| k == 'APP_NAME' }.last}/deploy\n"
+  io << "default run\n"
 end
 
 # =======================
@@ -685,7 +685,7 @@ rule gen_test
   description = Generate test ‘$out’…
 
 rule link_test
-  command = $CXX -o $out $in $LN_FLAGS $RAVE_FLAGS
+  command = '$CXX' -o $out $in $LN_FLAGS $RAVE_FLAGS
   description = Link test ‘$out’…
 
 rule run_test
@@ -701,11 +701,11 @@ rule link_static
   description = Archive objects ‘$out’…
 
 rule link_dynamic
-  command = $CXX -o $out $in $LN_FLAGS $RAVE_FLAGS -dynamiclib -current_version 1.0.1 -compatibility_version 1.0.0
+  command = '$CXX' -o $out $in $LN_FLAGS $RAVE_FLAGS -dynamiclib -current_version 1.0.1 -compatibility_version 1.0.0
   description = Link dynamic library ‘$out’…
 
 rule link_executable
-  command = $CXX -o $out $in $LN_FLAGS $RAVE_FLAGS
+  command = '$CXX' -o $out $in $LN_FLAGS $RAVE_FLAGS
   description = Link executable ‘$out’…
 
 rule run_executable

@@ -1,5 +1,63 @@
 # Release Notes
 
+## 2012-08-14
+
+* Pressing ⌥F2 with focus in the file browser now show the context menu.
+* The `TM_DROPPED_FILE` variable had a path relative to project directory instead of current file. This would make some drop commands insert wrong path.
+* Dropping binary files onto the text view for which there is no drop command will now insert the path for the file dropped. Hint: You can hold down control (⌃) when dropping text files to get the “insert path” behavior.
+* The `--host=auto` option to `rmate` didn’t work. *[Timothy Andrew]*
+* Added simplified Chinese localization for interface files. *[Bo Xiao]*
+* Bundle items with both a tab trigger and key equivalent now show both. *[Adam Strzelecki]*
+* The bundle menu in the status bar can now be opened via ⌥F1 and will default to select the bundle for the current language. *[Adam Strzelecki]*
+* Further fixes to handling of txmt: URLs without a file argument.
+
+## 2012-08-13
+
+* Consecutive deletes extend the yank clipboard.
+* Tab triggers are once again rendered in the menu (though presently without the rounded rectangle) and all key equivalents are now shown menu (e.g. `⌃!` would previously not show). Also several legacy APis have been updated to the latest from Apple *[jtbandes]*
+* When clearing the “CJK edit buffer” (e.g. via escape) then the following key press would be treated literally, e.g. pressing escape or delete would insert the character code for this key.
+* Fixed crash when setting a non-path for `projectDirectory` and then doing a project folder search.
+* For users of proxy auto-configuration (PAC) scripts, the actual URL TextMate needs to connect to (for software and bundle updates plus crash reporting) is now given to the PAC script.
+* Fix crash for proxy users (introduced in last build).
+
+## 2012-08-12
+
+* Fix problem with pressing return, tab, or escape after inserting CJK.
+* Add bundle menu to the status bar. *[Elia Schito]*
+* Changed Find/Replace combobox height to 21, to be aligned with other controls. *[Bo Xiao]*
+
+## 2012-08-11
+
+* Implement ⌃Y for yanking last deletion. *[Nathaniel Tagg]*
+* Added fullscreen behavior to document window and View → Enter/Exit Full Screen menu item. *[Jesse B. Hannah]*
+* When closing last document (except empty untitled ones) for a window with a visible file browser, we now keep the window around *[Mads Hartmann Jensen]*
+* If TextMate was launched via `git commit` then the Git bundle would have issues (since it would inherit a wrong `GIT_DIR` environment variables)
+* Preliminary support for installing bundles and bundle items (including themes) via double-click (from Finder). You can hold down option (⌥) if you wish to open them as folders/property lists.
+
+## 2012-08-10
+
+The source for TextMate 2 is now [available at GitHub][1] under a GPL 3 license. There is an [interview at Ars Technica][2] that gives some background about what motivated this decision.
+
+[1]: https://github.com/textmate/textmate
+[2]: http://arstechnica.com/apple/2012/08/odgaard-i-will-continue-working-on-textmate-as-long-as-i-am-a-mac-user/
+
+* TextMate 2 now require 10.7
+* When opening an already open folder (e.g. `mate .`) the window with that folder is brought to front *[Adam Strzelecki]*
+* When no URL is given in a `txmt` URL then current document is used (this affected e.g. clicking errors in a ruby stack dump when running untitled files) *[Gerd Knops]*
+* Opening `txmt` URLs with escaped spaces no longer fail *[Gerd Knops]*
+* git: If a folder contains files with mixed status, the folder itself now gets a badge *[Gerd Knops]*
+* SCM badges are now enabled for disk images *[Gerd Knops]*
+* Scope selectors now support anchoring matches by using `^`, `$`, and `>` to anchor to either the first, last, or previous scope element *[Joachim Mårtensson]*
+* Subversion support (badges) has been disabled. The `libsvn.a` used was an older version which didn’t support the most recent repository format, and building the latest version gave rise to a few problems. Moving forward, I think subversion support should be re-added by calling the `svn` shell command to obtain status (this is the approach taken for both git and mercurial).
+* Absolute paths in the “Find in Folder” results now use the name of the disk instead of `/` as first element
+* git: Updated driver to work with the new way submodules have their metadata in the super project.
+* Tab triggers are no longer rendered in the menu. This is caused by the switch to the 10.7 SDK which no longer allow the old way of rendering these items. Replacement code is of course planned.
+* Projects with a `*.ninja` file now get the `attr.project.ninja` scope.
+* Sections in `.tm_properties` files can now target multiple globs/scopes by separating them with a semi-colon, e.g.:
+	
+		[ source.ruby; *.rb ]
+		tabSize = 2
+
 ## 2012-07-09
 
 * Signed for Gatekeeper.

@@ -84,9 +84,16 @@ static std::vector<bundles::item_ptr> items_for_tab_expansion (ng::buffer_t cons
 	size_t line  = buffer.convert(caret).line;
 	size_t bol   = buffer.begin(line);
 
+	bool lastWasWordChar           = false;
+	std::string lastCharacterClass = ng::kCharacterClassUnknown;
+
 	for(size_t i = bol; i < caret; i += buffer[i].size())
 	{
-		if(i == bol || !text::is_word_char(buffer[i-1]))
+		// we don’t use text::is_word_char because that function treats underscores as word characters, which is undesired, see <issue://157>.
+		bool isWordChar = CFCharacterSetIsLongCharacterMember(CFCharacterSetGetPredefined(kCFCharacterSetAlphaNumeric), utf8::to_ch(buffer[i]));
+		std::string characterClass = character_class(buffer, i);
+
+		if(i == bol || lastWasWordChar != isWordChar || lastCharacterClass != characterClass)
 		{
 			std::vector<bundles::item_ptr> const& items = bundles::query(bundles::kFieldTabTrigger, buffer.substr(i, caret), ng::scope(buffer, ng::ranges_t(i), scopeAttributes));
 			if(!items.empty())
@@ -96,6 +103,9 @@ static std::vector<bundles::item_ptr> items_for_tab_expansion (ng::buffer_t cons
 				return items;
 			}
 		}
+
+		lastWasWordChar    = isWordChar;
+		lastCharacterClass = characterClass;
 	}
 
 	return std::vector<bundles::item_ptr>();
@@ -619,23 +629,21 @@ static std::string shell_quote (std::vector<std::string> paths)
 	if(!markedRanges.empty())
 		editor->set_selections(markedRanges);
 	markedRanges = ng::ranges_t();
-	if([[aString description] length] != 0)
-	{
-		editor->insert(to_s([aString description]), true);
-		pendingMarkedRanges = editor->ranges();
-		markedRanges = pendingMarkedRanges;
+	editor->insert(to_s([aString description]), true);
+	if([aString length] != 0)
+		markedRanges = editor->ranges();
+	pendingMarkedRanges = markedRanges;
 
-		ng::ranges_t sel;
-		citerate(range, editor->ranges())
-		{
-			std::string const str = document->buffer().substr(range->min().index, range->max().index);
-			char const* base = str.data();
-			size_t from = utf16::advance(base, aRange.location) - base;
-			size_t to   = utf16::advance(base, aRange.location + aRange.length) - base;
-			sel.push_back(ng::range_t(range->min() + from, range->min() + to));
-		}
-		editor->set_selections(sel);
+	ng::ranges_t sel;
+	citerate(range, editor->ranges())
+	{
+		std::string const str = document->buffer().substr(range->min().index, range->max().index);
+		char const* base = str.data();
+		size_t from = utf16::advance(base, aRange.location) - base;
+		size_t to   = utf16::advance(base, aRange.location + aRange.length) - base;
+		sel.push_back(ng::range_t(range->min() + from, range->min() + to));
 	}
+	editor->set_selections(sel);
 }
 
 - (NSRange)selectedRange
@@ -1008,6 +1016,9 @@ static void update_menu_key_equivalents (NSMenu* menu, action_to_key_t const& ac
 - (void)interpretKeyEvents:(NSArray*)someEvents
 {
 	AUTO_REFRESH;
+	if([self hasMarkedText])
+		return [super interpretKeyEvents:someEvents];
+
 	for(NSEvent* event in someEvents)
 	{
 		plist::dictionary_t::const_iterator pair = KeyEventContext->find(to_s(event));
@@ -1506,6 +1517,12 @@ static void update_menu_key_equivalents (NSMenu* menu, action_to_key_t const& ac
 	[self setShowLiveSearch:YES];
 }
 
+- (IBAction)showBundlesMenu:(id)sender
+{
+	OakDocumentView* documentView = (OakDocumentView*)[[self enclosingScrollView] superview];
+	[documentView performSelector:@selector(showBundleItemSelector:) withObject:nil];
+}
+
 - (IBAction)findNext:(id)sender
 {
 	if(liveSearchViewController)
@@ -1942,14 +1959,26 @@ static void update_menu_key_equivalents (NSMenu* menu, action_to_key_t const& ac
 
 	if(allHandlers.empty())
 	{
+		bool binary = false;
 		std::string merged = "";
 		for(NSString* path in someFiles)
 		{
 			D(DBF_OakTextView_DragNDrop, bug("insert as text: %s\n", [path UTF8String]););
 			std::string const& content = path::content(to_s(path));
-			if(content.size() < SQ(1024) || NSAlertDefaultReturn == NSRunAlertPanel(@"Inserting Large File", @"The file “%@” has a size of %.1f MB. Are you sure you want to insert this as a text file?", @"Insert File", @"Cancel", nil, [path stringByAbbreviatingWithTildeInPath], content.size() / SQ(1024.0))) // larger than 1 MB?
+			if(!utf8::is_valid(content.begin(), content.end()))
+				binary = true;
+			else if(content.size() < SQ(1024) || NSAlertDefaultReturn == NSRunAlertPanel(@"Inserting Large File", @"The file “%@” has a size of %.1f MB. Are you sure you want to insert this as a text file?", @"Insert File", @"Cancel", nil, [path stringByAbbreviatingWithTildeInPath], content.size() / SQ(1024.0))) // larger than 1 MB?
 				merged += content;
 		}
+
+		if(binary)
+		{
+			std::vector<std::string> paths;
+			for(NSString* path in someFiles)
+				paths.push_back(to_s(path));
+			merged = text::join(paths, "\n");
+		}
+
 		AUTO_REFRESH;
 		editor->insert(merged, true);
 	}
@@ -1961,7 +1990,7 @@ static void update_menu_key_equivalents (NSMenu* menu, action_to_key_t const& ac
 
 			void update_environment (std::map<std::string, std::string>& env)
 			{
-				env["PWD"] = format_string::expand("${TM_PROJECT_DIRECTORY:-${TM_DIRECTORY:-$TMPDIR}}", env);
+				env["PWD"] = format_string::expand("${TM_DIRECTORY:-${TM_PROJECT_DIRECTORY:-$TMPDIR}}", env);
 				env["TM_MODIFIER_FLAGS"] = _modifier_flags;
 
 				std::vector<std::string> files;

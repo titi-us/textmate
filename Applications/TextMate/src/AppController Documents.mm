@@ -43,8 +43,14 @@ static NSString* const OakGlobalSessionInfo = @"OakGlobalSessionInfo";
 	openPanel.title                           = [NSString stringWithFormat:@"%@: Open", [[[NSBundle mainBundle] localizedInfoDictionary] valueForKey: @"CFBundleName"] ?: [[NSProcessInfo processInfo] processName]];
 
 	[openPanel setShowsHiddenFilesCheckBox:YES];
-	if([openPanel runModalForTypes:nil] == NSOKButton)
-		OakOpenDocuments([openPanel filenames]);
+	if([openPanel runModal] == NSOKButton)
+	{
+		NSMutableArray* filenames = [NSMutableArray array];
+		for(NSURL* url in [openPanel URLs])
+			[filenames addObject:[[url filePathURL] path]];
+
+		OakOpenDocuments(filenames);
+	}
 }
 
 - (BOOL)application:(NSApplication*)theApplication openFile:(NSString*)aPath
@@ -84,7 +90,7 @@ static NSString* const OakGlobalSessionInfo = @"OakGlobalSessionInfo";
 			if([keyValue count] == 2)
 			{
 				std::string key = to_s([[keyValue firstObject] stringByReplacingPercentEscapesUsingEncoding:NSUTF8StringEncoding]);
-				NSURL* fileURL = key == "url" ? [NSURL URLWithString:[[keyValue lastObject] stringByReplacingPercentEscapesUsingEncoding:NSUTF8StringEncoding]] : nil;
+				NSURL* fileURL = key == "url" ? [NSURL URLWithString:[keyValue lastObject]] : nil;
 				parameters[key] = to_s([fileURL isFileURL] ? [fileURL path] : [[keyValue lastObject] stringByReplacingPercentEscapesUsingEncoding:NSUTF8StringEncoding]);
 			}
 		}
@@ -93,6 +99,11 @@ static NSString* const OakGlobalSessionInfo = @"OakGlobalSessionInfo";
 		std::map<std::string, std::string>::const_iterator const& line    = parameters.find("line");
 		std::map<std::string, std::string>::const_iterator const& column  = parameters.find("column");
 		std::map<std::string, std::string>::const_iterator const& project = parameters.find("project");
+
+		text::range_t range = text::range_t::undefined;
+		size_t col = column != parameters.end() ? atoi(column->second.c_str()) : 1;
+		if(line != parameters.end())
+			range = text::pos_t(atoi(line->second.c_str())-1, col-1);
 
 		if(url != parameters.end())
 		{
@@ -103,11 +114,6 @@ static NSString* const OakGlobalSessionInfo = @"OakGlobalSessionInfo";
 			}
 			else if(path::exists(path))
 			{
-				text::range_t range = text::range_t::undefined;
-				size_t col = column != parameters.end() ? atoi(column->second.c_str()) : 1;
-				if(line != parameters.end())
-					range = text::pos_t(atoi(line->second.c_str())-1, col-1);
-
 				document::document_ptr doc = document::create(path);
 				doc->set_recent_tracking(false);
 				document::show(doc, project != parameters.end() ? oak::uuid_t(project->second) : document::kCollectionCurrent, range);
@@ -117,9 +123,39 @@ static NSString* const OakGlobalSessionInfo = @"OakGlobalSessionInfo";
 				NSRunAlertPanel(@"File Does not Exist", @"The item “%@” does not exist.", @"Continue", nil, nil, [NSString stringWithCxxString:path]);
 			}
 		}
+		else if(range != text::range_t::undefined)
+		{
+			for(NSWindow* win in [NSApp orderedWindows])
+			{
+				BOOL foundTextView = [[win firstResponder] tryToPerform:@selector(setSelectionString:) with:[NSString stringWithCxxString:range]];
+				if(!foundTextView)
+				{
+					NSMutableArray* allViews = [[[[win contentView] subviews] mutableCopy] autorelease];
+					for(NSUInteger i = 0; i < [allViews count]; ++i)
+						[allViews addObjectsFromArray:[[allViews objectAtIndex:i] subviews]];
+
+					for(NSView* view in allViews)
+					{
+						if([view respondsToSelector:@selector(setSelectionString:)])
+						{
+							[view performSelector:@selector(setSelectionString:) withObject:[NSString stringWithCxxString:range]];
+							[win makeFirstResponder:view];
+							foundTextView = YES;
+							break;
+						}
+					}
+				}
+
+				if(foundTextView)
+				{
+					[win makeKeyAndOrderFront:self];
+					break;
+				}
+			}
+		}
 		else
 		{
-			NSRunAlertPanel(@"Missing Parameter", @"You need to provide the URL parameter.", @"Continue", nil, nil);
+			NSRunAlertPanel(@"Missing Parameter", @"You need to provide either a (file) url or line parameter. The URL given was: ‘%@’.", @"Continue", nil, nil, aURL);
 		}
 	}
 	else

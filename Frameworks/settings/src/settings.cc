@@ -3,7 +3,6 @@
 #include "track_paths.h"
 #include <OakSystem/application.h>
 #include <plist/plist.h>
-#include <OakSystem/process.h>
 #include <plist/uuid.h>
 #include <oak/oak.h>
 #include <regexp/format_string.h>
@@ -58,7 +57,7 @@ namespace
 	static std::vector<std::string> paths (std::string const& directory)
 	{
 		std::vector<std::string> res;
-		for(std::string cwd = directory; true; cwd = cwd == "/" ? path::home() : path::parent(cwd))
+		for(std::string cwd = path::is_absolute(directory) ? directory : path::home(); true; cwd = cwd == "/" ? path::home() : path::parent(cwd))
 		{
 			res.push_back(path::join(cwd, ".tm_properties"));
 			if(cwd == path::home())

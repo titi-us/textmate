@@ -7,14 +7,34 @@ public:
 	{
 		TS_WARN("TODO: Child and anchor selectors");
 		TS_ASSERT_EQUALS(scope::selector_t("foo fud").does_match("foo bar fud"),   true);
-		// TS_ASSERT_EQUALS(scope::selector_t("foo > fud").does_match("foo bar fud"), false);
+		TS_ASSERT_EQUALS(scope::selector_t("foo > fud").does_match("foo bar fud"), false);
+		TS_ASSERT_EQUALS(scope::selector_t("foo > foo > fud").does_match("foo foo fud"), true);
+		TS_ASSERT_EQUALS(scope::selector_t("foo > foo > fud").does_match("foo foo fud fud"), true);
+		TS_ASSERT_EQUALS(scope::selector_t("foo > foo > fud").does_match("foo foo fud baz"), true);
+
+		TS_ASSERT_EQUALS(scope::selector_t("foo > foo fud > fud").does_match("foo foo bar fud fud"), true);
+
+	}
+
+	void test_mixed ()
+	{
+		TS_ASSERT_EQUALS(scope::selector_t("^ foo > bar").does_match("foo bar foo"), true);
+		TS_ASSERT_EQUALS(scope::selector_t("foo > bar $").does_match("foo bar foo"), false);
+		TS_ASSERT_EQUALS(scope::selector_t("bar > foo $").does_match("foo bar foo"), true);
+		TS_ASSERT_EQUALS(scope::selector_t("foo > bar > foo $").does_match("foo bar foo"), true);
+		TS_ASSERT_EQUALS(scope::selector_t("^ foo > bar > foo $").does_match("foo bar foo"), true);
+		TS_ASSERT_EQUALS(scope::selector_t("bar > foo $").does_match("foo bar foo"), true);
+		TS_ASSERT_EQUALS(scope::selector_t("^ foo > bar > baz").does_match("foo bar baz foo bar baz"), true);
+		TS_ASSERT_EQUALS(scope::selector_t("^ foo > bar > baz").does_match("foo foo bar baz foo bar baz"), false);
+				
 	}
 
 	void test_anchor ()
 	{
 		TS_ASSERT_EQUALS(scope::selector_t("^ foo").does_match("foo bar"), true);
-		// TS_ASSERT_EQUALS(scope::selector_t("^ bar").does_match("foo bar"), false);
-		// TS_ASSERT_EQUALS(scope::selector_t("foo $").does_match("foo bar"), false);
+		TS_ASSERT_EQUALS(scope::selector_t("^ bar").does_match("foo bar"), false);
+		TS_ASSERT_EQUALS(scope::selector_t("^ foo").does_match("foo bar foo"), true);
+		TS_ASSERT_EQUALS(scope::selector_t("foo $").does_match("foo bar"), false);
 		TS_ASSERT_EQUALS(scope::selector_t("bar $").does_match("foo bar"), true);
 	}
 

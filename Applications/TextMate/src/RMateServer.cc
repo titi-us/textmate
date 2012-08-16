@@ -5,10 +5,11 @@
 #include <oak/debug.h>
 #include <authorization/authorization.h>
 #include <io/io.h>
+#include <OakAppKit/IOAlertPanel.h>
 
 OAK_DEBUG_VAR(RMateServer);
 
-#define SOCKET_PATH "/tmp/avian.sock"
+#define OLD_SOCKET_PATH "/tmp/avian.sock"
 
 /*
 	open
@@ -120,28 +121,36 @@ namespace
 {
 	struct mate_server_t
 	{
-		mate_server_t ()
+		mate_server_t () : _socket_path(path::join(path::temp(), "textmate.sock"))
 		{
-			D(DBF_RMateServer, bug("%s\n", SOCKET_PATH););
-			unlink(SOCKET_PATH);
+			D(DBF_RMateServer, bug("%s\n", _socket_path.c_str()););
+			unlink(_socket_path.c_str());
 
 			socket_t fd(socket(AF_UNIX, SOCK_STREAM, 0));
 			fcntl(fd, F_SETFD, 1);
-			struct sockaddr_un addr = { 0, AF_UNIX, SOCKET_PATH };
+			struct sockaddr_un addr = { 0, AF_UNIX };
+			strcpy(addr.sun_path, _socket_path.c_str());
 			addr.sun_len = SUN_LEN(&addr);
-			bind(fd, (sockaddr*)&addr, sizeof(addr));
-			listen(fd, 5);
+			if(bind(fd, (sockaddr*)&addr, sizeof(addr)) == -1)
+				OakRunIOAlertPanel("Could not bind to socket:\n%s", _socket_path.c_str());
+			else if(listen(fd, 5) == -1)
+				OakRunIOAlertPanel("Could not listen to socket");
+
+			unlink(OLD_SOCKET_PATH);
+			link(_socket_path.c_str(), OLD_SOCKET_PATH);
 
 			_callback.reset(new socket_callback_t(&rmate_connection_handler_t, fd));
 		}
 
 		~mate_server_t ()
 		{
-			D(DBF_RMateServer, bug("%s\n", SOCKET_PATH););
-			unlink(SOCKET_PATH);
+			D(DBF_RMateServer, bug("%s\n", _socket_path.c_str()););
+			unlink(_socket_path.c_str());
+			unlink(OLD_SOCKET_PATH);
 		}
 
 	private:
+		std::string _socket_path;
 		socket_callback_ptr _callback;
 	};
 
